@@ -285,244 +285,7 @@ def open_small_short(crypto_currency, current_kline_time):
 #################################################################################################
 
 
-def open_long(crypto_currency, current_kline_time, mod_02, mod_03, mod_a):
-    
-    trigger_time = int(time.time())
-    
 
-    while True:
-        try:
-            # mark_price = float(api.Futures_client.mark_price(Symbol)["markPrice"])  - limit_price_shift
-            mark_price = float(api.client.futures_orderbook_ticker(symbol=Symbol, requests_params={'timeout': 3})['askPrice']) - limit_price_shift
-
-            # crypto_currency.order_kline_time = current_kline_time
-            break
-        except:
-            print('Get orderbook failed -> sleep(0.5)')
-            time.sleep(1)
-            pass
-
-
-    
-    long_params = {'symbol': Symbol,
-                'side': 'BUY',
-                'positionSide': 'LONG',
-                'type': 'LIMIT', # 'MARKET',
-                'quantity': order_qty,
-                'price': round(mark_price, 2),
-                'timeInForce': 'GTC',
-                'recvWindow': 3000,
-                'timestamp': int(time.time() * 1000)
-                }
-
-    while True:
-        try:
-            print('Open long order')
-            long_response = api.Futures_client.new_order(**long_params)
-            print(long_response)
-            time.sleep(1)
-            break
-        except Exception as ex:
-            print(ex)
-            print('\nOpen main short order failed -> sleep(0.5)')
-            time.sleep(1)
-            pass
-
-
-    while (long_response['status'] != 'FILLED') and ((int(time.time()) - trigger_time) < 15):
-        # print((int(time.time()) - trigger_time))
-        try:
-            long_response = api.Futures_client.query_order(**{'symbol': Symbol,
-                                                            'orderId': long_response['orderId'],
-                                                            'timestamp': int(time.time() * 1000)})
-            time.sleep(0.5)
-        except Exception as ex:
-            print(ex, '\nQuery main short order failed -> sleep(1)')
-            time.sleep(1)
-            pass
-
-    
-
-    if long_response['status'] == 'FILLED':
-        crypto_currency.order_kline_time = current_kline_time
-        print('Open stop loss market order')
-        stop_long_params = {'symbol': Symbol,
-                    'side': 'SELL',
-                    'positionSide': 'LONG',
-                    'type': 'STOP', #'STOP_MARKET',
-                    'stopPrice': str(round(mark_price*(1-mod_02), 2)),          # str(round(mark_price*(1-mod_a), 2))
-                    'price': str(round(mark_price*(1-mod_02), 2)),
-                    'quantity': str(order_qty),
-                    'timeInForce': 'GTC',
-                    'recvWindow': '3000',
-                    'priceProtect': 'TRUE',
-                    'timestamp': str(int(time.time() * 1000))
-                    }
-
-        print('Open take profit market order')
-        takeprofit_long_params = {'symbol': Symbol,
-                    'side': 'SELL',
-                    'positionSide': 'LONG',
-                    'type': 'LIMIT',
-                    'price': str(round(mark_price*(1+mod_03), 2)),
-                    'quantity': str(order_qty),
-                    'timeInForce': 'GTC',
-                    'recvWindow': '3000',
-                    'timestamp': str(int(time.time() * 1000))
-                    }
-        while True:
-            try:
-                stop_long_response, takeprofit_long_response = api.Futures_client.new_batch_order([stop_long_params, takeprofit_long_params])
-
-                stop_take_pairs[long_response['orderId']] = [stop_long_response['orderId'], takeprofit_long_response['orderId']]
-                winsound.PlaySound(sound='SystemHand', flags=winsound.SND_ALIAS)
-                #crypto_currency.last_open_orders_id.append(long_response['orderId'])
-                ####### crypto_currency.last_open_order_type = 'LONG'
-                print(stop_long_response, takeprofit_long_response)
-                break
-
-            except Exception as ex:
-                print(ex)
-                print('Open TP/SL long failed -> sleep(1)')
-                time.sleep(1)
-                # pass
-    
-    else:
-        trigger_time = int(time.time())
-        while (int(time.time()) - trigger_time < 5):
-            try:
-                api.Futures_client.cancel_order(**{'symbol': Symbol,
-                                                'orderId': long_response['orderId'],
-                                                'timestamp': int(time.time() * 1000)})
-                break
-            except:
-                print('Cancel long order failed -> sleep(0.5)')
-                time.sleep(1)
-                pass
-
-def open_short(crypto_currency, current_kline_time, mod_02, mod_03, mod_a):
-    
-    
-
-    # mark_price = float(api.client.futures_orderbook_ticker(symbol=Symbol, requests_params={'timeout': 3})['bidPrice']) + limit_price_shift
-    trigger_time = int(time.time())
-
-    
-
-    while True:
-        try:
-            # mark_price = float(api.Futures_client.mark_price(Symbol)["markPrice"]) + limit_price_shift
-            mark_price = float(api.client.futures_orderbook_ticker(symbol=Symbol, requests_params={'timeout': 3})['bidPrice']) + limit_price_shift
-
-            # crypto_currency.order_kline_time = current_kline_time
-            break
-        except:
-            print('Get orderbook failed -> sleep(0.5)')
-            time.sleep(1)
-            pass
-
-    
-    short_params = {'symbol': Symbol,
-                    'side': 'SELL', #'SELL',
-                    'positionSide': 'SHORT',
-                    'type': 'LIMIT', #'MARKET',
-                    'quantity': order_qty,
-                    'price': round(mark_price, 2),
-                    'timeInForce': 'GTC',
-                    'recvWindow': 3000,
-                    'timestamp': int(time.time() * 1000),
-                    #'reduceOnly': 'false'
-                }
-    
-    
-    while True:
-        try:
-            print('Open short order')
-            short_response = api.Futures_client.new_order(**short_params)
-            print(short_response)
-            time.sleep(1)
-            break
-        except Exception as ex:
-            print(ex)
-            print('Open main short order failed -> sleep(1)')
-            time.sleep(1)
-            pass
-
-    
-
-    while (short_response['status'] != 'FILLED') and (short_response['status'] != 'PLACED') and ((int(time.time()) - trigger_time) < 15):
-        # print((int(time.time()) - trigger_time))
-        try:
-            short_response = api.Futures_client.query_order(**{'symbol': Symbol,
-                                                            'orderId': short_response['orderId'],
-                                                            'timestamp': int(time.time() * 1000)})
-            time.sleep(0.5)
-        except Exception as ex:
-            print(ex, '\nQuery main short order failed -> sleep(1)')
-            time.sleep(1)
-            pass
-
-    if short_response['status'] == 'FILLED':
-        crypto_currency.order_kline_time = current_kline_time
-        print('Main short Filled')
-        print('Open stop loss order')
-        stop_short_params = {'symbol': Symbol,
-                    'side': 'BUY',  #'BUY',
-                    'positionSide': 'SHORT',
-                    'type': 'STOP', # 'STOP_MARKET',
-                    'stopPrice': str(round(mark_price*(1 + mod_02), 2)),
-                    'price': str(round(mark_price*(1 + mod_02), 2)),
-                    'quantity': str(order_qty),
-                    'timeInForce': 'GTC',
-                    'recvWindow': '3000',
-                    'timestamp': str(int(time.time() * 1000)),
-                    #'reduceOnly': 'false'
-                    }
-
-        print('Open take profit market order')
-        takeprofit_short_params = {'symbol': Symbol,
-                    'side': 'BUY',
-                    'positionSide': 'SHORT',
-                    'type': 'LIMIT',
-                    'price':str(round(mark_price*(1-mod_03)-0.05, 2)),
-                    'quantity': str(order_qty),
-                    'timeInForce': 'GTC',
-                    'recvWindow': '3000',
-                    'priceProtect': 'TRUE',
-                    'timestamp': str(int(time.time() * 1000)),
-                    #'reduceOnly': 'false'
-                    }
-        while True:
-            try:
-                stop_short_response, takeprofit_short_response = api.Futures_client.new_batch_order([stop_short_params, takeprofit_short_params])
-
-                stop_take_pairs[short_response['orderId']] = [stop_short_response['orderId'], takeprofit_short_response['orderId']]
-                winsound.PlaySound(sound='SystemHand', flags=winsound.SND_ALIAS)
-                #crypto_currency.last_open_orders_id.append(short_response['orderId'])
-                ###### crypto_currency.last_open_order_type = 'SHORT'
-                print(stop_short_response,'/n', takeprofit_short_response)
-
-                break
-                
-            except Exception as ex:
-                print(ex)
-                print('Open TP/SL short failed -> sleep(1)')
-                time.sleep(1)
-                # pass
-
-    else:
-        trigger_time = int(time.time())
-        while (int(time.time()) - trigger_time < 5):
-            try:
-                api.Futures_client.cancel_order(**{'symbol': Symbol,
-                                                'orderId': short_response['orderId'],
-                                                'timestamp': int(time.time() * 1000)})
-
-                break
-            except:
-                print('Cancel short order failed -> sleep(0.5)')
-                time.sleep(1)
-                pass
 
 def trade(new_kline, crypto_currency):
     now_time = time.time()
@@ -542,21 +305,9 @@ def trade(new_kline, crypto_currency):
     #print(dpo[-5:])
     macd = Indicators.MACD(crypto_currency)[-3:]
 
-    #is_dpo_high = np.mean(dpo[-2:]) > np.mean(dpo[-3:-1])
-    #is_dpo_low = np.mean(dpo[-2:]) < np.mean(dpo[-3:-1])
-    #is_roc_high = (np.mean(roc_arr[-3:]) > roc_arr[-4]) and (roc > -0.15)
-    #is_roc_low = (np.mean(roc_arr[-3:]) < roc_arr[-4]) and (roc < 0.15)
-    is_macd_long = (np.mean(macd[-2:]) > np.mean(macd[-3:-1])) and (rsi[-1] > np.mean(rsi[-4:-1])) and (rsi[-1] < 60) # (macd[-1] > 0.035) and 
-    is_macd_short = (macd[-1] < -0.035) and (np.mean(macd[-2:]) < np.mean(macd[-3:-1])) and (rsi[-1] < np.mean(rsi[-4:-1])) and (rsi[-1] > 40) # (macd[-1] < -0.035) and 
-    # Set flag (allow to open order)
-    #price_corridor_flag = (sma*0.9987 < crypto_currency.close_values[-1] < sma*1.0013)
 
-    mod_02 = min_sl
-    mod_03 = min_tp
-    mod_a = min_sl_activation
-    # if vol_frac < 0.2:
-    #     mod_02 *= 0.6
-    #     mod_03 *= 0.6
+    is_macd_long = (np.mean(macd[-2:]) > np.mean(macd[-3:-1])) and (rsi[-1] > np.mean(rsi[-4:-1])) and (rsi[-1] < 60) # (macd[-1] > 0.035) and 
+    #is_macd_short = (macd[-1] < -0.035) and (np.mean(macd[-2:]) < np.mean(macd[-3:-1])) and (rsi[-1] < np.mean(rsi[-4:-1])) and (rsi[-1] > 40) # (macd[-1] < -0.035) and 
 
 
     def common_trade():            
@@ -567,11 +318,11 @@ def trade(new_kline, crypto_currency):
             match crypto_currency.last_open_order_type:
                 case 'ANY':
                     ### Trade both side
-                    if is_macd_long: #(48 < rsi < 52) and (-0.15 < roc < 0.15) and is_dpo_greater:
+                    if is_macd_long: #(48 < rsi < 52) and (-0.15 < roc < 0.15):
                         #Long
                         open_small_long(crypto_currency, current_kline_time)
                         pass
-                   # elif is_macd_short: #(48 < rsi < 52) and (-0.15 < roc < 0.15) and (not is_dpo_greater):
+                   # elif is_macd_short: #(48 < rsi < 52) and (-0.15 < roc < 0.15):
                         #Short
                         # open_small_short(crypto_currency, current_kline_time)     
                    #     pass    
@@ -592,14 +343,10 @@ def trade(new_kline, crypto_currency):
         case "COMMON":
             # crypto_currency.next_mode = "HF"
             common_trade()
-            
-        #case "HF":
-        #    crypto_currency.next_mode = "COMMON"
-        #    hf_trade()
+
             
 
     ####### Cancel orders ###########
-    # print('Cancel orders')
     rm_keys = set()
     for main_order_id in stop_take_pairs:
 
@@ -663,13 +410,6 @@ def trade(new_kline, crypto_currency):
     for key in rm_keys:
         stop_take_pairs.pop(key)
 
-    # if stop_take_pairs == {}:
-    #    crypto_currency.order_kline_time = 0
-
-    # crypto_currency.prev_dpo = dpo[-1]
-    #time.sleep(0.8)
-    #print('Next iteration')
-
 
 def set_websocket_and_trade(Symbol, Interval, crypto_currency):
     socket = f'wss://fstream.binance.com/ws/{Symbol.lower()}@kline_{Interval}'
@@ -685,7 +425,6 @@ def set_websocket_and_trade(Symbol, Interval, crypto_currency):
                      candle['v'] 
                     ]]
         trade(new_kline, crypto_currency)
-        # print('New iteration')
 
 
 
