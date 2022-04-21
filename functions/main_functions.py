@@ -34,12 +34,12 @@ def get_conditions_to_open_order(crypto_currency):
     # macd = Indicators.MACD(crypto_currency, 40, 200, 20)
 
     #sma_long_diff = (np.mean(sma_slow[-3:]) / np.mean(sma_slow[-6:-3])) > 1.002
-    long_flag = ((sma_slow[-2] < crypto_currency.close_values[-1] < np.mean(sma_slow[-2:])*1.1) and
+    long_flag = ((sma_slow[-2] < crypto_currency.close_values[-1] < np.mean(sma_slow[-2:])*1.01) and
                 (np.mean(sma_slow[-3:]) > np.mean(sma_slow[-6:-2])) and
                 (rsi < 60))
 
     #sma_short_diff = (np.mean(sma_slow[-3:]) / np.mean(sma_slow[-6:-3])) < 0.995
-    short_flag = ((sma_slow[-2] > crypto_currency.close_values[-1] > np.mean(sma_slow[-2:])*0.955) and
+    short_flag = ((sma_slow[-2] > crypto_currency.close_values[-1] > np.mean(sma_slow[-2:])*0.99) and
                  (np.mean(sma_slow[-3:]) < np.mean(sma_slow[-6:-2])) and
                  (rsi > 40))
 
