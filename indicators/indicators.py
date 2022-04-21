@@ -1,7 +1,7 @@
 import pandas as pd
 import ta
 import numpy as np
-from talipp.indicators import TSI, MACD
+from talipp.indicators import MACD
 
 class Indicators:
     @staticmethod
@@ -20,26 +20,23 @@ class Indicators:
     @staticmethod
     def ROC(crypto_currency, w=90):
         close_finished = np.asarray(crypto_currency.close_values) # [-w-1:]
-
         roc = ta.momentum.roc(pd.DataFrame(close_finished)[0], window=w).values
         return roc
 
     @staticmethod
     def SMA(crypto_currency, w=180):
         close_finished = np.asarray(crypto_currency.close_values)[-w-1:]
-        sma = ta.trend.sma_indicator(pd.DataFrame(close_finished)[0], window=w)
+        sma = ta.trend.sma_indicator(pd.DataFrame(close_finished)[0], window=w).values
         return sma
 
     @staticmethod
     def DPO(crypto_currency, w=14):
         close_finished = np.asarray(crypto_currency.close_values)[-50:]
         dpo = ta.trend.dpo(pd.DataFrame(close_finished)[0], window=w).values
-        #dpo = DPO(period=21, input_values=close_finished)
         return dpo
 
     @staticmethod
-    def MACD(crypto_currency, wf=6, ws=21):
-        close_finished = np.asarray(crypto_currency.close_values)[-43:]
-        #macd = ta.trend.macd(pd.DataFrame(close_finished)[0], window_fast=wf, window_slow=ws).values
+    def MACD(crypto_currency, wf=6, ws=21, sp=6):
+        close_finished = np.asarray(crypto_currency.close_values)[-ws-1:]
         macd = MACD(fast_period=wf, slow_period=ws, signal_period=wf, input_values=close_finished)
         return macd.to_lists()["histogram"]

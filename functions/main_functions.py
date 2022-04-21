@@ -29,26 +29,23 @@ def error_wrapper(func):
 def get_conditions_to_open_order(crypto_currency):
     sma_slow = Indicators.SMA(crypto_currency, w=200)
     sma_fast = Indicators.SMA(crypto_currency, w=40)
+
     rsi = Indicators.RSI(crypto_currency)
-    macd = Indicators.MACD(crypto_currency, 40, 200, 20)
+    # macd = Indicators.MACD(crypto_currency, 40, 200, 20)
 
-    sma_long_diff = (np.mean(sma_slow[-3:]) / np.mean(sma_slow[-6:-3])) > 1.002
-    long_flag = ((np.mean(sma_slow[-2:]) < crypto_currency.close_values[-1] < np.mean(sma_fast[-2:])) and
-                (crypto_currency.close_values[-1] < np.mean(sma_slow[-2:])*1.1) and
-                sma_long_diff and
-                (rsi < 60) and
-                (np.mean(macd[-3:] > np.mean(macd[-5:-2]))))
+    #sma_long_diff = (np.mean(sma_slow[-3:]) / np.mean(sma_slow[-6:-3])) > 1.002
+    long_flag = ((sma_slow[-2] < crypto_currency.close_values[-1] < np.mean(sma_slow[-2:])*1.1) and
+                (np.mean(sma_slow[-3:]) > np.mean(sma_slow[-6:-2])) and
+                (rsi < 60))
 
-    sma_slow_diff = (np.mean(sma_slow[-3:]) / np.mean(sma_slow[-6:-3])) < 0.995
-    short_flag = ((np.mean(sma_slow[-2:]) > crypto_currency.close_values[-1] > np.mean(sma_fast[-2:])) and
-                (crypto_currency.close_values[-1] > np.mean(sma_slow[-2:])*0.955) and
-                sma_slow_diff and
-                (rsi > 40) and
-                (np.mean(macd[-3:] < np.mean(macd[-5:-2]))))
+    #sma_short_diff = (np.mean(sma_slow[-3:]) / np.mean(sma_slow[-6:-3])) < 0.995
+    short_flag = ((sma_slow[-2] > crypto_currency.close_values[-1] > np.mean(sma_slow[-2:])*0.955) and
+                 (np.mean(sma_slow[-3:]) < np.mean(sma_slow[-6:-2])) and
+                 (rsi > 40))
 
     crypto_currency.sma200 = sma_slow[-1]
     crypto_currency.sma40 = sma_fast[-1]
-
+    crypto_currency.rsi = rsi
     return long_flag, short_flag
 
 @error_wrapper
@@ -188,7 +185,7 @@ def get_stop_and_reopen(crypto_currency, api):
                 (float(response['stopPrice']) < crypto_currency.sma200) and
                 is_new):
 
-                if (crypto_currency.sma40 > crypto_currency.sma200) and (crypto_currency.close_values[-1] > crypto_currency.sma40*1.03):
+                if (crypto_currency.sma40 > crypto_currency.sma200) and (crypto_currency.close_values[-1] > crypto_currency.sma40*1.05) and (crypto_currency.rsi > 70):
                     stop_L_resp = open_order(crypto_currency, crypto_currency.sma40 - 0.05, api, 'STOP_LONG')
                 else:
                     stop_L_resp = open_order(crypto_currency, crypto_currency.sma200 - 0.05, api, 'STOP_LONG')
@@ -203,7 +200,7 @@ def get_stop_and_reopen(crypto_currency, api):
                   (float(response['stopPrice']) > crypto_currency.sma200) and
                   is_new):
 
-                if (crypto_currency.sma40 < crypto_currency.sma200) and (crypto_currency.close_values[-1] < crypto_currency.sma40*0.997):
+                if (crypto_currency.sma40 < crypto_currency.sma200) and (crypto_currency.close_values[-1] < crypto_currency.sma40*0.95) and (crypto_currency.rsi < 30):
                     stop_L_resp = open_order(crypto_currency, crypto_currency.sma40 + 0.05, api, 'STOP_SHORT')
                 else:
                     stop_L_resp = open_order(crypto_currency, crypto_currency.sma200 + 0.05, api, 'STOP_SHORT')
