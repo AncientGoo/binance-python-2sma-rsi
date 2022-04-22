@@ -26,13 +26,13 @@ class Indicators:
     @staticmethod
     def SMA(crypto_currency, w=180):
         close_finished = np.asarray(crypto_currency.close_values)[-w-1:]
-        sma = ta.trend.sma_indicator(pd.DataFrame(close_finished)[0], window=w).values
+        sma = ta.trend.sma_indicator(pd.DataFrame(close_finished)[0], window=w)
         return sma
 
     @staticmethod
     def DPO(crypto_currency, w=14):
         close_finished = np.asarray(crypto_currency.close_values)[-50:]
-        dpo = ta.trend.dpo(pd.DataFrame(close_finished)[0], window=w).values
+        dpo = ta.trend.dpo(pd.DataFrame(close_finished)[0], window=w)
         return dpo
 
     @staticmethod

@@ -24,7 +24,12 @@ if __name__ == "__main__":
     while True:
         for crypto_currency in Crypto_Currencies:
             # print('Switch to ', crypto_currency.symbol)
-            trade(crypto_currency, api)
+            try:
+                trade(crypto_currency, api)
+            except Exception as ex:
+                print(ex)
+                time.sleep(30)
+                pass
 
                   
 

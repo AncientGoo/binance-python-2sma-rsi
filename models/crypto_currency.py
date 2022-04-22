@@ -13,6 +13,7 @@ class CryptoCurrency:
     sma40 = 0
     rsi = 0
 
+    sma_fast = None
     
     def __init__(self, symbol, interval, limit, order_qty):
         self.symbol = symbol

@@ -27,21 +27,24 @@ def error_wrapper(func):
 
 
 def get_conditions_to_open_order(crypto_currency):
-    sma_slow = Indicators.SMA(crypto_currency, w=200)
-    sma_fast = Indicators.SMA(crypto_currency, w=40)
+    sma_slow = Indicators.SMA(crypto_currency, w=200).iloc[-2:].values
+    sma_fast = Indicators.SMA(crypto_currency, w=40).iloc[-2:].values
 
-    rsi = Indicators.RSI(crypto_currency)
+
+    rsi = Indicators.RSI(crypto_currency).iloc[-1]
     # macd = Indicators.MACD(crypto_currency, 40, 200, 20)
 
     #sma_long_diff = (np.mean(sma_slow[-3:]) / np.mean(sma_slow[-6:-3])) > 1.002
-    long_flag = ((sma_slow[-2] < crypto_currency.close_values[-1] < np.mean(sma_slow[-2:])*1.01) and
-                (np.mean(sma_slow[-3:]) > np.mean(sma_slow[-6:-2])) and
-                (rsi < 60))
+    long_flag = ((sma_slow[-2] < crypto_currency.close_values[-2] < sma_slow[-1]*1.01) and
+                (sma_slow[-1] >= sma_slow[-2]) and
+                (rsi < 60) and
+                (sma_fast[-1] >= sma_fast[-2]))
 
     #sma_short_diff = (np.mean(sma_slow[-3:]) / np.mean(sma_slow[-6:-3])) < 0.995
-    short_flag = ((sma_slow[-2] > crypto_currency.close_values[-1] > np.mean(sma_slow[-2:])*0.99) and
-                 (np.mean(sma_slow[-3:]) < np.mean(sma_slow[-6:-2])) and
-                 (rsi > 40))
+    short_flag = ((sma_slow[-2] > crypto_currency.close_values[-2] > sma_slow[-1]*0.99) and
+                 (sma_slow[-1] <= sma_slow[-2]) and
+                 (rsi > 40) and
+                 (sma_fast[-1] <= sma_fast[-2]))
 
     crypto_currency.sma200 = sma_slow[-1]
     crypto_currency.sma40 = sma_fast[-1]
@@ -142,12 +145,12 @@ def cancel_order(crypto_currency, orderId, api):
 
 def open_long_and_stop(crypto_currency, api):
     
-    ask_price, bid_price = get_order_book(crypto_currency)
+    ask_price, bid_price = get_order_book(crypto_currency, api)
 
     long_response = open_order(crypto_currency, ask_price, api, "LONG")
     
     trigger_time = int(time.time())
-    while (long_response['status'] != 'FILLED') and ((int(time.time()) - trigger_time) < 15):
+    while (long_response['status'] != 'FILLED') and ((int(time.time()) - trigger_time) < 30):
         long_response = query_order(crypto_currency, long_response['orderId'], api)
         
     if long_response['status'] == 'FILLED':
@@ -157,12 +160,12 @@ def open_long_and_stop(crypto_currency, api):
         cancel_order(crypto_currency, long_response['orderId'], api)
 
 def open_short_and_stop(crypto_currency, api):
-    ask_price, bid_price = get_order_book(crypto_currency)
+    ask_price, bid_price = get_order_book(crypto_currency, api)
 
     short_response = open_order(crypto_currency, bid_price, api, "SHORT")
     
     trigger_time = int(time.time())
-    while (short_response['status'] != 'FILLED') and ((int(time.time()) - trigger_time) < 15):
+    while (short_response['status'] != 'FILLED') and ((int(time.time()) - trigger_time) < 30):
         short_response = query_order(crypto_currency, short_response['orderId'], api)
 
     if short_response['status'] == 'FILLED':
@@ -230,7 +233,7 @@ def check_open_positions(crypto_currency, max_amount: float, api):
 
 def trade(crypto_currency, api):
     now_time = time.time()
-    if (now_time - crypto_currency.prev_time) > 180:
+    if (now_time - crypto_currency.prev_time) > 1800:
         print(crypto_currency.symbol, '\n', time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now_time)))
         crypto_currency.prev_time = now_time
 
@@ -246,12 +249,12 @@ def trade(crypto_currency, api):
         match crypto_currency.permitted_order_type:
             case 'ANY':
                 if long_flag:
-
-                   open_long_and_stop(crypto_currency, api)
+                    print(crypto_currency.symbol, 'Long flag == True')
+                    open_long_and_stop(crypto_currency, api)
 
                 elif short_flag:
-
-                   open_short_and_stop(crypto_currency, api)
+                    print(crypto_currency.symbol, 'Short flag == True')
+                    open_short_and_stop(crypto_currency, api)
 
             case "MAX_SIZE":
                 pass
