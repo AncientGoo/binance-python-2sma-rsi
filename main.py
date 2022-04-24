@@ -1,11 +1,12 @@
 from apikey import Keys
 from functions.main_functions import *
 
-Symbols = {'BNBBUSD': 0.02,
-           'SOLBUSD': 1,
-           'ADABUSD': 6,
-           'XRPBUSD': 7,
-           'DOGEBUSD': 36}
+Symbols = {'BNBBUSD': [0.02, 2],
+           'SOLBUSD': [1, 2],
+           'ADABUSD': [7, 4],
+           'XRPBUSD': [8, 4],
+           'DOGEBUSD': [38, 5],
+           }
 
 
 Interval = '6h'
