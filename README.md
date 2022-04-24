@@ -1,4 +1,4 @@
 # binance-python-rsi-roc-bot
 
 
-Looks like strategy doen't work for now
+Long-time strategy (6h klines, 50 days sma, 10 days sma). Testing now.
