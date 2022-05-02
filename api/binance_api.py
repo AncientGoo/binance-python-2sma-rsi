@@ -67,16 +67,16 @@ class Binance:
             crypto_currency.close_values.pop(0)
             crypto_currency.volume.pop(0)
         
-            crypto_currency.open_time.append(int(klines[0][0]))
-            crypto_currency.open_values.append(float(klines[0][1]))
-            crypto_currency.high_values.append(float(klines[0][2]))
-            crypto_currency.low_values.append(float(klines[0][3]))
-            crypto_currency.close_values.append(float(klines[0][4]))
-            crypto_currency.volume.append(float(klines[0][5]))
+            crypto_currency.open_time.append(int(klines[1][0]))
+            crypto_currency.open_values.append(float(klines[1][1]))
+            crypto_currency.high_values.append(float(klines[1][2]))
+            crypto_currency.low_values.append(float(klines[1][3]))
+            crypto_currency.close_values.append(float(klines[1][4]))
+            crypto_currency.volume.append(float(klines[1][5]))
 
 
 
-        crypto_currency.current_kline_time = int(klines[0][0])
+        crypto_currency.current_kline_time = int(klines[1][0])
 
 
 

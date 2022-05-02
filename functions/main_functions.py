@@ -5,7 +5,6 @@ import win32api
 import numpy as np
 from api.binance_api import Binance
 
-
 def error_wrapper(func): 
     def wrapper(*args):
         trigger_time = time.time()
@@ -15,11 +14,11 @@ def error_wrapper(func):
                 return resp
 
             except Exception as ex:
+                if ex.args[2] == "Order does not exist.":
+                    return ex.args[2]
                 print(ex)
                 print('Error in', str(func))
                 time.sleep(5)
-               # if ex.args[2] == "Order does not exist":
-               #     return ex.args[2]
                 if time.time()-trigger_time > 30:
                     break
                 else:
@@ -34,33 +33,30 @@ def get_conditions_to_open_order(crypto_currency):
     sma_slow = Indicators.SMA(crypto_currency, w=200).iloc[-2:].values
     sma_fast = Indicators.SMA(crypto_currency, w=40).iloc[-2:].values
 
-    # print(sma_fast, sma_slow)
-
-    #print(sma_slow[-1])
 
     rsi = Indicators.RSI(crypto_currency).iloc[-1]
-    # macd = Indicators.MACD(crypto_currency, 40, 200, 20)
 
-    #sma_long_diff = (np.mean(sma_slow[-3:]) / np.mean(sma_slow[-6:-3])) > 1.002
+
     long_flag = ((sma_slow[-1] < crypto_currency.close_values[-1] < sma_slow[-1]*1.01) and
-                #(sma_slow[-1] >= sma_slow[-2]) and
                 (sma_fast[-1] > sma_slow[-1]) and
-                (rsi < 60) and (sma_fast[-1] > sma_slow[-1]) and
-                ((sma_fast[-1]/(sma_fast[-2]) >= 0.998)))
+                (rsi < 60))
+                #or
+                #(crypto_currency.close_values[-2] > sma_slow[-1]) and
+                #(crypto_currency.close_values[-1] < sma_slow[-1]*1.01))
 
-    #sma_short_diff = (np.mean(sma_slow[-3:]) / np.mean(sma_slow[-6:-3])) < 0.995
     short_flag = ((sma_slow[-1] > crypto_currency.close_values[-1] > sma_slow[-1]*0.99) and
-                 #(sma_slow[-1] <= sma_slow[-2]) and
                  (sma_fast[-1] < sma_slow[-1]) and
-                 (rsi > 40) and (sma_fast[-1] < sma_slow[-1]) and
-                 ((sma_fast[-1]/(sma_fast[-2]) <= 1.002)))
+                 (rsi > 40))
+                 #or
+                 #(crypto_currency.close_values[-2] < sma_slow[-1]) and 
+                 #(crypto_currency.close_values[-1] > sma_slow[-1]*0.99))
 
-    crypto_currency.sma200 = sma_slow[-2]
-    crypto_currency.sma40 = sma_fast[-2]
+    crypto_currency.sma200 = sma_slow[-1]
+    crypto_currency.sma40 = sma_fast[-1]
     crypto_currency.rsi = rsi
 
 
-    # print(long_flag, short_flag)
+    
     return long_flag, short_flag
 
 @error_wrapper
@@ -173,10 +169,11 @@ def open_long_and_stop(crypto_currency, api):
     
     
     if long_response['status'] == 'FILLED':
-        time.sleep(3)
+        time.sleep(2)
         stop_long_response = open_order(crypto_currency, crypto_currency.sma200*0.995, api, "STOP_LONG")
-        # print(stop_long_response)
-        time.sleep(3)
+        #crypto_currency.active_pos_amount += crypto_currency.order_qty
+
+        #time.sleep(3)
         
     else:
         cancel_order(crypto_currency, long_response['orderId'], api)
@@ -198,10 +195,10 @@ def open_short_and_stop(crypto_currency, api):
     
 
     if short_response['status'] == 'FILLED':
-        time.sleep(3)
+        time.sleep(2)
         stop_short_response = open_order(crypto_currency, crypto_currency.sma200*1.005, api, "STOP_SHORT")
-        # print(stop_short_response)
-        time.sleep(3)
+        #crypto_currency.active_pos_amount += crypto_currency.order_qty
+        #time.sleep(3)
             
     else:
         cancel_order(crypto_currency, short_response['orderId'], api)
@@ -212,66 +209,77 @@ def open_short_and_stop(crypto_currency, api):
 
 def get_stop_and_reopen(crypto_currency, api):
 
-    now_time = time.time()
-
     rm_list = {'STOP_LONG': [],
                 'STOP_SHORT': []}
     app_list = {'STOP_LONG': [],
                 'STOP_SHORT': []}
 
-    if ((now_time-crypto_currency.prev_time) >= 360):
-        print(crypto_currency.symbol, '\n', time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now_time)))
-        crypto_currency.prev_time = now_time  
+    now_time = time.time()
+    if ((now_time-crypto_currency.prev_time) >= 60*15):
+
+        print(crypto_currency.symbol, '     ',
+              time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())), '     ',
+              "sma40/sma200", round(crypto_currency.sma40/crypto_currency.sma200, 3), '     ',
+              round(crypto_currency.sma200, 3), round(crypto_currency.sma40, 3), '     ', end = "\r")
+
+        crypto_currency.prev_time = now_time
 
         #print('Reopen stops')
         for ordtype in crypto_currency.stop_orders:
             
             for id in crypto_currency.stop_orders[ordtype]:
-                print('\n', crypto_currency.stop_orders)
+                # print('\n', crypto_currency.stop_orders)
 
                 response = query_order(crypto_currency, id, api)
-                is_new = (response['status'] == 'NEW')
+                if response == 'Order does not exist.':
+                    rm_list[ordtype].append(id)
+                else:
+                    is_new = (response['status'] == 'NEW')
 
-                if ((ordtype == 'STOP_LONG') and
-                    (float(response['stopPrice']) < crypto_currency.sma200) and
-                    is_new):
+                    if ((ordtype == 'STOP_LONG') and
+                        (float(response['stopPrice']) < crypto_currency.sma200*0.995) and
+                        is_new):
 
-                    cancel_order(crypto_currency, id, api)
-                    rm_list['STOP_LONG'].append(id)
-                    #crypto_currency.stop_orders[ordtype].remove(id)
-                    print('New stop')
-                    if (crypto_currency.sma40 > crypto_currency.sma200) and (crypto_currency.close_values[-1] > crypto_currency.sma40) and (crypto_currency.rsi > 60):
-                        stop_resp = open_order(crypto_currency, crypto_currency.sma40*0.995, api, 'STOP_LONG', 'NOT')
-                    else:
-                        stop_resp = open_order(crypto_currency, crypto_currency.sma200*0.995, api, 'STOP_LONG', 'NOT')
+                        cancel_order(crypto_currency, id, api)
+                        rm_list['STOP_LONG'].append(id)
+                        time.sleep(1)
+                        
+                        print('New stop')
+                        if (crypto_currency.sma40 > crypto_currency.sma200) and (crypto_currency.close_values[-1] > crypto_currency.sma40) and (crypto_currency.rsi > 55):
+                            stop_resp = open_order(crypto_currency, crypto_currency.sma40*0.995, api, 'STOP_LONG', 'NOT')
+                        else:
+                            stop_resp = open_order(crypto_currency, crypto_currency.sma200*0.995, api, 'STOP_LONG', 'NOT')
 
-                    app_list['STOP_LONG'].append(stop_resp['orderId'])
-                    
+                        app_list['STOP_LONG'].append(stop_resp['orderId'])
+                        
 
 
-                elif ((ordtype == 'STOP_SHORT') and
-                    (float(response['stopPrice']) > crypto_currency.sma200) and
-                    is_new):
+                    elif ((ordtype == 'STOP_SHORT') and
+                        (float(response['stopPrice']) > crypto_currency.sma200*1.005) and
+                        is_new):
 
-                    cancel_order(crypto_currency, id, api)
-                    rm_list['STOP_SHORT'].append(id)
-                    #crypto_currency.stop_orders[ordtype].remove(id)
-                    print('New stop')
-                    if (crypto_currency.sma40 < crypto_currency.sma200) and (crypto_currency.close_values[-1] < crypto_currency.sma40) and (crypto_currency.rsi < 40):
-                        stop_resp = open_order(crypto_currency, crypto_currency.sma40*1.005, api, 'STOP_SHORT', 'NOT')
-                    else:
-                        stop_resp = open_order(crypto_currency, crypto_currency.sma200*1.005, api, 'STOP_SHORT', 'NOT')
+                        cancel_order(crypto_currency, id, api)
+                        rm_list['STOP_SHORT'].append(id)
+                        time.sleep(1)
+                        
+                        print('New stop')
+                        if (crypto_currency.sma40 < crypto_currency.sma200) and (crypto_currency.close_values[-1] < crypto_currency.sma40) and (crypto_currency.rsi < 45):
+                            stop_resp = open_order(crypto_currency, crypto_currency.sma40*1.005, api, 'STOP_SHORT', 'NOT')
+                        else:
+                            stop_resp = open_order(crypto_currency, crypto_currency.sma200*1.005, api, 'STOP_SHORT', 'NOT')
 
-                    app_list['STOP_SHORT'].append(stop_resp['orderId'])
+                        app_list['STOP_SHORT'].append(stop_resp['orderId'])
                 
 
     for key in rm_list:
-        for id in rm_list[key]:
+        for id in rm_list[key]:           
             crypto_currency.stop_orders[key].remove(id)
+            crypto_currency.active_pos_amount -= crypto_currency.order_qty
 
     for key in app_list:
-        for id in app_list[key]:
+        for id in app_list[key]:            
             crypto_currency.stop_orders[key].append(id)
+            crypto_currency.active_pos_amount += crypto_currency.order_qty
 
     
 
@@ -284,18 +292,23 @@ def get_position_info(crypto_currency, api):
     pos_response = api.client.futures_position_information(symbol=crypto_currency.symbol)[0]
     return pos_response
 
-def check_open_positions(crypto_currency, max_amount: float, api):
-    time.sleep(3)
-    
-    if crypto_currency.permitted_order_type != 'ANY':
-        pos_response = get_position_info(crypto_currency, api)
-        crypto_currency.active_pos_amount = float(pos_response['positionAmt'])
-        if np.abs(crypto_currency.active_pos_amount) < max_amount*0.9:
-            crypto_currency.permitted_order_type = "ANY"
-        elif np.abs(crypto_currency.active_pos_amount) >= max_amount*0.9:
-            crypto_currency.permitted_order_type = "MAX_SIZE"
+def check_open_positions(crypto_currency, mult: float, api):
+    max_amount = crypto_currency.order_qty * mult
 
-        print('Check_open_positions', pos_response)
+    if crypto_currency.active_pos_amount >= max_amount:
+        crypto_currency.permitted_order_type = "MAX_SIZE"
+    else:
+        crypto_currency.permitted_order_type = "ANY"
+
+    # if crypto_currency.permitted_order_type != 'ANY':
+    #     pos_response = get_position_info(crypto_currency, api)
+    #     crypto_currency.active_pos_amount = float(pos_response['positionAmt'])
+    #     if np.abs(crypto_currency.active_pos_amount) < max_amount*0.9:
+    #         crypto_currency.permitted_order_type = "ANY"
+    #     elif np.abs(crypto_currency.active_pos_amount) >= max_amount*0.9:
+    #         crypto_currency.permitted_order_type = "MAX_SIZE"
+
+    #     print('Check_open_positions', pos_response)
 
 
 
@@ -307,27 +320,33 @@ def trade(crypto_currency, api):
         
 
     api.get_crypto_currency_update(crypto_currency)
+    
+    
 
+    if ((crypto_currency.current_kline_time - crypto_currency.order_kline_time) >= (60000*30)):  # More then *n minutes between orders
+        
 
-    if ((crypto_currency.current_kline_time - crypto_currency.order_kline_time) >= (60000*10)):  # More then *n minutes between orders
         long_flag, short_flag = get_conditions_to_open_order(crypto_currency)
-
-        check_open_positions(crypto_currency, 0.02, api)
+        check_open_positions(crypto_currency, 1, api)
 
         match crypto_currency.permitted_order_type:
             case 'ANY':
                 if long_flag:
                     print(crypto_currency.symbol, 'Long flag == True')
-                   # open_long_and_stop(crypto_currency, api)
+                    print("sma40/sma200 [-2]", round(crypto_currency.sma40/crypto_currency.sma200, 2))
+                    open_long_and_stop(crypto_currency, api)
 
                 elif short_flag:
                     print(crypto_currency.symbol, 'Short flag == True')
-                   # open_short_and_stop(crypto_currency, api)
+                    print("sma40/sma200 [-2]", round(crypto_currency.sma40/crypto_currency.sma200, 2))
+                    open_short_and_stop(crypto_currency, api)
 
             case "MAX_SIZE":
+                print("MAX_SIZE, active position amount =", crypto_currency.active_pos_amount)
                 pass
 
-        
+        long_flag, short_flag = False, False
+
     get_stop_and_reopen(crypto_currency, api)
 
 @error_wrapper

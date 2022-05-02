@@ -7,16 +7,15 @@ class CryptoCurrency:
     prev_dpo = None
     order_kline_time = 0
     current_kline_time = 0
-    
 
     stop_orders = {'STOP_LONG': [],
                    'STOP_SHORT': []}
 
-    sma200 = 0
-    sma40 = 0
-    rsi = 0
+    sma200 = 1
+    sma40 = 1
+    rsi = 50
 
-    sma_fast = None
+    # sma_fast = None
 
     def __init__(self, symbol, interval, limit, order_qty, precision):
         self.symbol = symbol
@@ -31,5 +30,6 @@ class CryptoCurrency:
         self.high_values = [None] * self.limit
         self.low_values = [None] * self.limit
         self.volume = [None] * self.limit
+        
 
         #self.prev_time = time.time()
